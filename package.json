@@ -1,0 +1,51 @@
+{
+  "name": "homebridge-skyq-s62-usb",
+  "version": "1.0.0",
+  "displayName": "Sky Q S6.2 USB Bridge",
+  "description": "Homebridge plugin that polls Sky Q boxes for now-playing data and forwards it to a Systemline S6.2 multi-room audio system via USB-to-RS232 serial cables. Reconstructs the Sky Gnome RS232 protocol so the S6.2 touch screen displays channel and programme information.",
+  "main": "index.js",
+  "scripts": {
+    "test": ""
+  },
+  "keywords": [
+    "homebridge-plugin",
+    "sky",
+    "skyq",
+    "sky q",
+    "systemline",
+    "s6.2",
+    "rs232",
+    "usb",
+    "serial",
+    "gnome",
+    "multiroom",
+    "now playing",
+    "epg"
+  ],
+  "author": {
+    "name": "Rich Dawson",
+    "url": "https://github.com/rdawson6"
+  },
+  "contributors": [
+    {
+      "name": "Kiro AI",
+      "url": "https://kiro.dev"
+    }
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=14.0.0",
+    "homebridge": "^1.0.0 || ^2.0.0"
+  },
+  "dependencies": {
+    "serialport": "^12.0.0"
+  },
+  "homepage": "https://github.com/rdawson6/homebridge-skyq-s62-usb#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rdawson6/homebridge-skyq-s62-usb"
+  },
+  "bugs": {
+    "url": "https://github.com/rdawson6/homebridge-skyq-s62-usb/issues"
+  }
+}

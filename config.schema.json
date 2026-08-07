@@ -1,0 +1,91 @@
+{
+    "pluginAlias": "SkyQS62USB",
+    "pluginType": "platform",
+    "singular": true,
+    "headerDisplay": "Polls Sky Q boxes for now-playing data and forwards it to a Systemline S6.2 via USB-to-RS232 serial cables. Each Sky Q box gets its own serial port connection to the S6.2. No HomeKit accessories are created — this is a background bridge service.",
+    "footerDisplay": "USB serial cables must be connected before Homebridge starts. Use 57600 baud, 8N1 for the S6.2 RS232 input. Identify your serial ports with <code>ls /dev/ttyUSB*</code> on the Pi.",
+    "schema": {
+        "type": "object",
+        "properties": {
+            "name": {
+                "title": "Platform Name",
+                "type": "string",
+                "default": "Sky Q S6.2 USB"
+            },
+            "sky_boxes": {
+                "title": "Sky Q Boxes",
+                "type": "array",
+                "items": {
+                    "title": "Sky Q Box",
+                    "type": "object",
+                    "properties": {
+                        "name": {
+                            "title": "Name",
+                            "type": "string",
+                            "placeholder": "Sky Q",
+                            "required": true,
+                            "description": "Friendly name for logs"
+                        },
+                        "skyq_ip": {
+                            "title": "Sky Q IP Address",
+                            "type": "string",
+                            "placeholder": "192.168.4.227",
+                            "required": true,
+                            "description": "IP address of the Sky Q box on your local network"
+                        },
+                        "serial_port": {
+                            "title": "Serial Port",
+                            "type": "string",
+                            "placeholder": "/dev/ttyUSB1",
+                            "required": true,
+                            "description": "USB serial device path (e.g. /dev/ttyUSB1)"
+                        },
+                        "baud_rate": {
+                            "title": "Baud Rate",
+                            "type": "integer",
+                            "default": 57600,
+                            "description": "Serial baud rate — must be 57600 for the S6.2 Sky Gnome protocol"
+                        },
+                        "poll_interval": {
+                            "title": "Poll Interval (seconds)",
+                            "type": "integer",
+                            "default": 15,
+                            "minimum": 5,
+                            "maximum": 60,
+                            "description": "How often to poll the Sky Q box. 15 seconds is recommended."
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "layout": [
+        {
+            "type": "section",
+            "title": "General",
+            "expandable": false,
+            "items": ["name"]
+        },
+        {
+            "type": "section",
+            "title": "Sky Q Boxes",
+            "description": "Add one entry per Sky Q box. Each needs its own USB-to-RS232 cable connected to a separate S6.2 RS232 input.",
+            "expandable": true,
+            "expanded": true,
+            "items": [
+                {
+                    "key": "sky_boxes",
+                    "type": "array",
+                    "buttonText": "Add Sky Q Box",
+                    "items": [
+                        "sky_boxes[].name",
+                        "sky_boxes[].skyq_ip",
+                        "sky_boxes[].serial_port",
+                        "sky_boxes[].baud_rate",
+                        "sky_boxes[].poll_interval"
+                    ]
+                }
+            ]
+        }
+    ]
+}
