@@ -52,6 +52,36 @@ To identify which USB device is which:
 udevadm info /dev/ttyUSB1 | grep ID_USB_MODEL
 ```
 
+### Stable device paths (recommended)
+
+USB serial devices can change numbering (`ttyUSB0`, `ttyUSB1`, etc.) after a reboot or power outage depending on which device enumerates first. This can cause the wrong device to be opened — potentially locking out other USB serial devices on the same Pi.
+
+**Fix:** Create udev rules that assign stable symlinks based on each cable's serial number.
+
+1. Find your cable serial numbers:
+```bash
+udevadm info /dev/ttyUSB0 | grep ID_USB_SERIAL_SHORT
+udevadm info /dev/ttyUSB1 | grep ID_USB_SERIAL_SHORT
+```
+
+2. Create `/etc/udev/rules.d/99-usb-serial.rules`:
+```
+SUBSYSTEM=="tty", ATTRS{idVendor}=="0403", ATTRS{serial}=="YOUR_SERIAL_1", SYMLINK+="ttyUSB_SKYQ_MAIN"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="0403", ATTRS{serial}=="YOUR_SERIAL_2", SYMLINK+="ttyUSB_SKYQ_MINI"
+```
+
+3. Reload rules:
+```bash
+sudo udevadm control --reload-rules && sudo udevadm trigger
+```
+
+4. Use the symlink paths in your config:
+```json
+"serial_port": "/dev/ttyUSB_SKYQ_MAIN"
+```
+
+This ensures the correct cable is always used regardless of boot order.
+
 ---
 
 ## Installation
@@ -117,7 +147,12 @@ Then log out and back in. The Homebridge user needs to be in the `dialout` group
 
 **Port not found**
 - Check the cable is plugged in: `ls /dev/ttyUSB*`
-- USB port assignment can change on reboot. Use `udevadm info` to identify by serial number.
+- USB port assignment can change on reboot. Use udev rules with stable symlinks (see above) to prevent this.
+
+**Wrong device opened after reboot**
+- USB numbering (`ttyUSB0`, `ttyUSB1`) can swap after a power outage
+- This can lock out other USB serial devices (e.g. C-Bus) on the same Pi
+- Solution: use udev symlinks based on serial number — see "Stable device paths" section above
 
 **S6.2 not showing channel info**
 - Check baud rate is 57600

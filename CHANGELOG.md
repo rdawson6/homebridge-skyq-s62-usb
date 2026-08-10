@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.0.1] - 2026-08-10
+
+### Added
+- README: "Stable device paths" section explaining udev rules for consistent USB serial assignment across reboots
+- README: Troubleshooting section updated with "wrong device opened after reboot" guidance
+
 ## [1.0.0] - 2026-08-07
 
 ### Initial release

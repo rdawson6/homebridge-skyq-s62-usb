@@ -1,6 +1,6 @@
 {
   "name": "homebridge-skyq-s62-usb",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "displayName": "Sky Q S6.2 USB Bridge",
   "description": "Homebridge plugin that polls Sky Q boxes for now-playing data and forwards it to a Systemline S6.2 multi-room audio system via USB-to-RS232 serial cables. Reconstructs the Sky Gnome RS232 protocol so the S6.2 touch screen displays channel and programme information.",
   "main": "index.js",
