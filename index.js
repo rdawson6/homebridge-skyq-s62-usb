@@ -43,35 +43,16 @@ SkyQS62USBPlatform.prototype.accessories = function(callback) {
     return;
   }
 
-  var started = 0;
+  // Each bridge owns and manages its own serial port, including reopening it
+  // if the USB device is unplugged or glitches off the bus.
   for (var i = 0; i < self.sky_boxes.length; i++) {
-    (function(boxConfig) {
-      var portPath = boxConfig.serial_port || "/dev/ttyUSB1";
-      var baudRate = parseInt(boxConfig.baud_rate) || 57600;
-
-      var port = new SerialPort({
-        path:     portPath,
-        baudRate: baudRate,
-        dataBits: 8,
-        parity:   "none",
-        stopBits: 1,
-        autoOpen: false
-      });
-
-      port.open(function(err) {
-        if (err) {
-          self.log("[" + boxConfig.name + "] ERROR: Failed to open " + portPath + ": " + err.message);
-        } else {
-          self.log("[" + boxConfig.name + "] Serial " + portPath + " open at " + baudRate + " baud");
-          var bridge = new SkyQUSBBridge(boxConfig, self.log, port);
-          self._bridges.push(bridge);
-          bridge.start();
-        }
-        started++;
-        if (started === self.sky_boxes.length) callback([]);
-      });
-    })(self.sky_boxes[i]);
+    var bridge = new SkyQUSBBridge(self.sky_boxes[i], self.log, SerialPort);
+    self._bridges.push(bridge);
+    bridge.start();
   }
+
+  // No HomeKit accessories — return immediately rather than waiting on ports
+  callback([]);
 };
 
 /* =============================================================================
@@ -219,12 +200,17 @@ function _formatTime(d) {
 /* =============================================================================
    Bridge — one per Sky Q box, each with its own USB serial port
    ============================================================================= */
-function SkyQUSBBridge(config, log, port) {
+function SkyQUSBBridge(config, log, SerialPortClass) {
   this.name          = config.name || "Sky Q";
   this.skyq_ip       = config.skyq_ip;
+  this.portPath      = config.serial_port || "/dev/ttyUSB0";
+  this.baudRate      = parseInt(config.baud_rate) || 57600;
   this.poll_interval = (config.poll_interval || 15) * 1000;
   this.log           = log;
-  this._port         = port;
+  this._SerialPort   = SerialPortClass;
+  this._port         = null;
+  this._portReady    = false;
+  this._reconnTimer  = null;
   this._controlPath  = null;
   this._channelMap   = null;
   this._lastStandby  = null;
@@ -235,7 +221,10 @@ function SkyQUSBBridge(config, log, port) {
 
 SkyQUSBBridge.prototype.start = function() {
   var self = this;
-  self.log("[" + self.name + "] Starting — Sky Q: " + self.skyq_ip);
+  self.log("[" + self.name + "] Starting — Sky Q: " + self.skyq_ip + " → " + self.portPath);
+
+  // Open the serial port (retries on its own if unavailable)
+  self._openPort();
 
   SkyQClient.discoverControlPath(self.skyq_ip, function(err, controlPath) {
     if (err) {
@@ -252,6 +241,79 @@ SkyQUSBBridge.prototype.start = function() {
       self._schedulePoll(0);
     });
   });
+};
+
+/* =============================================================================
+   Serial port management with automatic reconnect
+
+   USB serial adapters can drop off the bus — unplugged cable, power glitch, or
+   a hub hiccup. Without this the plugin would silently stop writing to the S6.2
+   until Homebridge was restarted.
+   ============================================================================= */
+SkyQUSBBridge.prototype._openPort = function() {
+  var self = this;
+
+  // Tear down any previous handle
+  if (self._port) {
+    try { self._port.removeAllListeners(); if (self._port.isOpen) self._port.close(); } catch(e) {}
+    self._port = null;
+  }
+  self._portReady = false;
+
+  self._port = new self._SerialPort({
+    path:     self.portPath,
+    baudRate: self.baudRate,
+    dataBits: 8,
+    parity:   "none",
+    stopBits: 1,
+    autoOpen: false
+  });
+
+  self._port.open(function(err) {
+    if (err) {
+      self.log("[" + self.name + "] Could not open " + self.portPath + ": " + err.message + " — retry in 10s");
+      self._scheduleReconnect();
+      return;
+    }
+
+    self._portReady = true;
+    self.log("[" + self.name + "] Serial " + self.portPath + " open at " + self.baudRate + " baud");
+
+    self._port.on("error", function(err) {
+      self.log("[" + self.name + "] Serial error: " + err.message);
+      self._handlePortLoss();
+    });
+
+    self._port.on("close", function() {
+      self.log("[" + self.name + "] Serial port closed");
+      self._handlePortLoss();
+    });
+  });
+};
+
+SkyQUSBBridge.prototype._handlePortLoss = function() {
+  if (!this._portReady && this._reconnTimer) return;  // Already recovering
+  this._portReady = false;
+  this._scheduleReconnect();
+};
+
+SkyQUSBBridge.prototype._scheduleReconnect = function() {
+  var self = this;
+  if (self._reconnTimer) return;
+
+  self._reconnTimer = setTimeout(function() {
+    self._reconnTimer = null;
+    self.log("[" + self.name + "] Reopening " + self.portPath + "...");
+
+    // Clear change-detection state so the next poll resends the current
+    // channel and programme — otherwise the S6.2 would keep showing whatever
+    // was on screen when the cable dropped.
+    self._lastStandby = null;
+    self._lastSID     = null;
+    self._lastProg    = null;
+
+    self._openPort();
+  }, 10000);
 };
 
 SkyQUSBBridge.prototype._schedulePoll = function(delay) {
@@ -309,11 +371,22 @@ SkyQUSBBridge.prototype._poll = function() {
 };
 
 SkyQUSBBridge.prototype._send = function(packet) {
-  if (!this._port || !this._port.isOpen) {
-    this.log("[" + this.name + "] Serial port not open — packet dropped");
+  var self = this;
+
+  if (!self._port || !self._port.isOpen || !self._portReady) {
+    self.log("[" + self.name + "] Serial port unavailable — packet dropped");
     return;
   }
-  this._port.write(packet, function(err) {
-    if (err) this.log("[" + this.name + "] Write error: " + err.message);
-  }.bind(this));
+
+  try {
+    self._port.write(packet, function(err) {
+      if (err) {
+        self.log("[" + self.name + "] Write error: " + err.message);
+        self._handlePortLoss();
+      }
+    });
+  } catch(e) {
+    self.log("[" + self.name + "] Write threw: " + e.message);
+    self._handlePortLoss();
+  }
 };

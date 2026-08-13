@@ -154,6 +154,12 @@ Then log out and back in. The Homebridge user needs to be in the `dialout` group
 - This can lock out other USB serial devices (e.g. C-Bus) on the same Pi
 - Solution: use udev symlinks based on serial number — see "Stable device paths" section above
 
+**Cable unplugged or device dropped off the bus**
+- From v1.1.0 the plugin detects this and retries every 10 seconds until the device returns, then resends the current channel and programme automatically
+- Look for `Serial port closed` followed by `Reopening ...` in the logs
+- No Homebridge restart is needed
+- If it never recovers, check the device is present with `ls -l /dev/ttyUSB*` and look for `USB disconnect` in `dmesg`
+
 **S6.2 not showing channel info**
 - Check baud rate is 57600
 - Check TX/RX wiring (pin 2/3 on DB9 — may need a null modem crossover)
